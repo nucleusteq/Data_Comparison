@@ -1,65 +1,170 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { api, SchemaDiffResponse, RowDiffResponse } from "@/lib/api";
+import { useLocalStorage } from "@/lib/storage";
+import { SchemaDiffView } from "@/components/SchemaDiffView";
+import { RowDiffView } from "@/components/RowDiffView";
+
+interface Persisted {
+  connA: string;
+  connB: string;
+  tableA: string;
+  tableB: string;
+  keyColumns: string;
+  schemaResult: SchemaDiffResponse | null;
+  rowResult: RowDiffResponse | null;
+}
+
+const EMPTY: Persisted = {
+  connA: "",
+  connB: "",
+  tableA: "",
+  tableB: "",
+  keyColumns: "",
+  schemaResult: null,
+  rowResult: null,
+};
 
 export default function Home() {
+  const { value: state, setValue: setState, clear } = useLocalStorage<Persisted>(
+    "comparison-tool-state",
+    EMPTY
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const update = (patch: Partial<Persisted>) => setState((s) => ({ ...s, ...patch }));
+
+  const run = async (fn: () => Promise<void>, label: string) => {
+    setError(null);
+    setBusy(label);
+    try {
+      await fn();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const compareSchema = () =>
+    run(async () => {
+      const res = await api.schemaDiff({
+        connection_a: state.connA,
+        connection_b: state.connB,
+        table_a: state.tableA,
+        table_b: state.tableB || state.tableA,
+      });
+      update({ schemaResult: res });
+    }, "schema");
+
+  const compareRows = () =>
+    run(async () => {
+      const keys = state.keyColumns
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const res = await api.rowDiff({
+        connection_a: state.connA,
+        connection_b: state.connB,
+        table_a: state.tableA,
+        table_b: state.tableB || state.tableA,
+        key_columns: keys,
+      });
+      update({ rowResult: res });
+    }, "rows");
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="mx-auto max-w-5xl p-6">
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold">Data Source Comparison Tool</h1>
+        <p className="text-sm text-gray-500">
+          Compare two database tables — schema and rows. All inputs and results
+          are saved in your browser&apos;s localStorage; nothing is stored on the server.
+        </p>
+      </header>
+
+      <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Field label="Source A connection string">
+          <input
+            className="input"
+            placeholder="postgresql+psycopg2://user:pass@host:5432/db"
+            value={state.connA}
+            onChange={(e) => update({ connA: e.target.value })}
+          />
+        </Field>
+        <Field label="Source B connection string">
+          <input
+            className="input"
+            placeholder="mysql+pymysql://user:pass@host:3306/db"
+            value={state.connB}
+            onChange={(e) => update({ connB: e.target.value })}
+          />
+        </Field>
+        <Field label="Table A">
+          <input
+            className="input"
+            placeholder="customers"
+            value={state.tableA}
+            onChange={(e) => update({ tableA: e.target.value })}
+          />
+        </Field>
+        <Field label="Table B (blank = same as A)">
+          <input
+            className="input"
+            placeholder="customers"
+            value={state.tableB}
+            onChange={(e) => update({ tableB: e.target.value })}
+          />
+        </Field>
+        <Field label="Key column(s), comma-separated (blank = primary key of A)">
+          <input
+            className="input"
+            placeholder="id"
+            value={state.keyColumns}
+            onChange={(e) => update({ keyColumns: e.target.value })}
+          />
+        </Field>
+      </section>
+
+      <div className="mb-6 flex flex-wrap gap-3">
+        <button className="btn btn-primary" disabled={!!busy} onClick={compareSchema}>
+          {busy === "schema" ? "Comparing…" : "Compare schemas"}
+        </button>
+        <button className="btn btn-primary" disabled={!!busy} onClick={compareRows}>
+          {busy === "rows" ? "Comparing…" : "Compare rows"}
+        </button>
+        <button
+          className="btn btn-ghost"
+          onClick={() => {
+            clear();
+            setError(null);
+          }}
+        >
+          Clear saved data
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-6 rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+          {error}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      )}
+
+      <div className="space-y-8">
+        {state.schemaResult && <SchemaDiffView data={state.schemaResult} />}
+        {state.rowResult && <RowDiffView data={state.rowResult} />}
+      </div>
+    </main>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
+      {children}
+    </label>
   );
 }
