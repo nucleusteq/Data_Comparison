@@ -10,6 +10,7 @@ import {
   newId,
   buildConnectionString,
   defaultFields,
+  missingRequiredFields,
 } from "@/lib/datasources";
 import { SettingsNav } from "@/components/SettingsNav";
 
@@ -53,6 +54,8 @@ export function DataSourceNav({
   const [draftTest, setDraftTest] = useState<{ state: TestState; msg?: string }>({
     state: "idle",
   });
+  // Becomes true after a failed Save attempt, so required-field errors show.
+  const [showErrors, setShowErrors] = useState(false);
 
   const startAdd = () => {
     setAdding(true);

@@ -351,7 +351,12 @@ function ColumnMapEditor({
 }
 
 function AdvancedOptions(props: Props) {
-  const { srcA, srcB, tableA, tableB, ignoreColumns, columnMap, whereA, whereB, onChange } = props;
+  const { srcA, srcB, tableA, tableB, onChange } = props;
+  // Persisted state from older versions may lack these fields, so default them.
+  const ignoreColumns = props.ignoreColumns ?? "";
+  const columnMap = props.columnMap ?? {};
+  const whereA = props.whereA ?? "";
+  const whereB = props.whereB ?? "";
   const [open, setOpen] = useState(
     !!(ignoreColumns || Object.keys(columnMap).length || whereA || whereB)
   );

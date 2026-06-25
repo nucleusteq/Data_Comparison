@@ -19,7 +19,23 @@ export function useLocalStorage<T>(key: string, initial: T) {
       if (cancelled) return;
       try {
         const raw = window.localStorage.getItem(key);
-        if (raw !== null) setValue(JSON.parse(raw) as T);
+        if (raw !== null) {
+          const parsed = JSON.parse(raw) as T;
+          // Merge over the default so fields added in newer versions aren't
+          // left undefined when an older persisted value is loaded.
+          if (
+            initial &&
+            typeof initial === "object" &&
+            !Array.isArray(initial) &&
+            parsed &&
+            typeof parsed === "object" &&
+            !Array.isArray(parsed)
+          ) {
+            setValue({ ...(initial as object), ...(parsed as object) } as T);
+          } else {
+            setValue(parsed);
+          }
+        }
       } catch {
         /* ignore malformed entries */
       }
@@ -28,6 +44,9 @@ export function useLocalStorage<T>(key: string, initial: T) {
     return () => {
       cancelled = true;
     };
+    // `initial` is a load-once default; re-running on its identity would clobber
+    // restored/edited state, so it is intentionally excluded from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   // Persist on change (after initial load).

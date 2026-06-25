@@ -161,3 +161,16 @@ export function defaultFields(kind: DbKind): Record<string, string> {
   for (const f of kindSpec(kind).fields) out[f.key] = f.default ?? "";
   return out;
 }
+
+/**
+ * Return the keys of required fields that are empty for this kind.
+ * Used to block saving an incomplete connection.
+ */
+export function missingRequiredFields(
+  kind: DbKind,
+  fields: Record<string, string>
+): string[] {
+  return kindSpec(kind)
+    .fields.filter((f) => f.required && !(fields[f.key] ?? "").trim())
+    .map((f) => f.key);
+}
