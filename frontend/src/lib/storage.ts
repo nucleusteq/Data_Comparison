@@ -11,15 +11,23 @@ export function useLocalStorage<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(initial);
   const [loaded, setLoaded] = useState(false);
 
-  // Load once on mount (client-only; avoids SSR hydration mismatch).
+  // Load once on mount (client-only; avoids SSR hydration mismatch). Deferred to
+  // a microtask so we never set state synchronously inside the effect body.
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (raw !== null) setValue(JSON.parse(raw) as T);
-    } catch {
-      /* ignore malformed entries */
-    }
-    setLoaded(true);
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (raw !== null) setValue(JSON.parse(raw) as T);
+      } catch {
+        /* ignore malformed entries */
+      }
+      setLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [key]);
 
   // Persist on change (after initial load).

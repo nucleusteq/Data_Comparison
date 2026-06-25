@@ -63,12 +63,26 @@ Use **Clear saved data** to wipe everything from localStorage.
 
 ## API endpoints
 
-| Method | Path               | Purpose                                   |
-|--------|--------------------|-------------------------------------------|
-| GET    | `/api/health`      | Health check                              |
-| POST   | `/api/tables`      | List tables for a connection              |
-| POST   | `/api/schema-diff` | Compare two tables' schemas               |
-| POST   | `/api/row-diff`    | Compare two tables' rows (keyed match)    |
+| Method | Path                | Purpose                                              |
+|--------|---------------------|------------------------------------------------------|
+| GET    | `/api/health`       | Health check                                         |
+| POST   | `/api/tables`       | List tables for a connection                         |
+| POST   | `/api/columns`      | List columns + primary key for a table               |
+| POST   | `/api/schema-diff`  | Compare schemas (columns, PK, indexes, FKs, constraints) |
+| POST   | `/api/quick-count`  | Cheap row-count-only pre-flight (no rows loaded)     |
+| POST   | `/api/row-diff`     | Compare two tables' rows (keyed match)               |
+| POST   | `/api/sync-sql`     | Generate INSERT/UPDATE/DELETE to make B match A      |
+| POST   | `/api/export-csv`   | Flatten a row diff to CSV                            |
+
+The schema diff reports differences in **columns** (type / nullability / default /
+autoincrement), **primary key**, **indexes**, **foreign keys**, **unique
+constraints**, and **check constraints** (the last two degrade gracefully on
+dialects that don't expose them).
+
+Table names may be schema-qualified (e.g. `public.orders`) and reserved-word /
+mixed-case names are quoted per the target dialect. Row comparison fetches rows
+ordered by the key column(s) so a truncated result is deterministic, and flags
+when the chosen key isn't unique.
 
 ## Notes
 

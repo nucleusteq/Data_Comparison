@@ -141,7 +141,7 @@ export function DataSourceNav({
   const preview = buildConnectionString(draftKind, draftFields);
 
   const editor = (
-    <div className="space-y-3 rounded-xl border border-indigo-200 bg-white p-3 shadow-sm animate-fade-in">
+    <div className="space-y-3 rounded-xl border border-indigo-200 bg-white p-3 shadow-sm animate-fade-in dark:border-indigo-800 dark:bg-gray-800">
       <label className="block">
         <span className="mb-1 block text-xs font-semibold text-gray-600">
           1. Database type
@@ -237,11 +237,11 @@ export function DataSourceNav({
   );
 
   return (
-    <aside className="flex h-full w-80 shrink-0 flex-col border-r border-gray-200 bg-gray-100/70">
-      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-        <h2 className="text-sm font-semibold tracking-wide text-gray-700">
+    <aside className="flex h-full w-80 shrink-0 flex-col border-r border-gray-200 bg-gray-100/70 dark:border-gray-700 dark:bg-gray-900/80">
+      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+        <h2 className="text-sm font-semibold tracking-wide text-gray-700 dark:text-gray-200">
           DATA SOURCES
-          <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
+          <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
             {sources.length}
           </span>
         </h2>
@@ -249,6 +249,24 @@ export function DataSourceNav({
           + Add
         </button>
       </div>
+
+      {/* Select which sources are compared as A and B */}
+      {sources.length > 0 && (
+        <div className="space-y-2 border-b border-gray-200 bg-white/60 px-3 py-3 dark:border-gray-700 dark:bg-gray-800/40">
+          <SourceSelect
+            slot="A"
+            sources={sources}
+            value={selectedAId}
+            onChange={(id) => onPick("A", id)}
+          />
+          <SourceSelect
+            slot="B"
+            sources={sources}
+            value={selectedBId}
+            onChange={(id) => onPick("B", id)}
+          />
+        </div>
+      )}
 
       <div className="scroll-thin flex-1 space-y-2 overflow-y-auto p-3">
         {adding && editor}
@@ -271,13 +289,13 @@ export function DataSourceNav({
           ) : (
             <div
               key={ds.id}
-              className="group rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition hover:border-indigo-300 hover:shadow"
+              className="group rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition hover:border-indigo-300 hover:shadow dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-500"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-2">
                   <span className="text-lg leading-none">{KIND_ICON[ds.kind]}</span>
                   <div className="min-w-0">
-                    <div className="truncate font-medium text-gray-800" title={ds.name}>
+                    <div className="truncate font-medium text-gray-800 dark:text-gray-100" title={ds.name}>
                       {ds.name}
                     </div>
                     <div
@@ -288,12 +306,15 @@ export function DataSourceNav({
                     </div>
                   </div>
                 </div>
-                <TestDot state={tests[ds.id] ?? "idle"} />
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                <SlotButton active={selectedAId === ds.id} slot="A" onClick={() => onPick("A", ds.id)} />
-                <SlotButton active={selectedBId === ds.id} slot="B" onClick={() => onPick("B", ds.id)} />
+                <div className="flex items-center gap-1.5">
+                  {selectedAId === ds.id && (
+                    <span className="chip bg-rose-600 text-white">A</span>
+                  )}
+                  {selectedBId === ds.id && (
+                    <span className="chip bg-emerald-600 text-white">B</span>
+                  )}
+                  <TestDot state={tests[ds.id] ?? "idle"} />
+                </div>
               </div>
 
               <div className="mt-2.5 flex gap-3 text-xs">
@@ -321,27 +342,39 @@ export function DataSourceNav({
   );
 }
 
-function SlotButton({
-  active,
+function SourceSelect({
   slot,
-  onClick,
+  sources,
+  value,
+  onChange,
 }: {
-  active: boolean;
   slot: "A" | "B";
-  onClick: () => void;
+  sources: DataSource[];
+  value: string | null;
+  onChange: (id: string) => void;
 }) {
-  const color = slot === "A" ? "bg-rose-600" : "bg-emerald-600";
+  const dot = slot === "A" ? "bg-rose-500" : "bg-emerald-500";
   return (
-    <button
-      onClick={onClick}
-      className={`chip transition ${
-        active
-          ? `${color} text-white`
-          : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
-      }`}
-    >
-      {active ? "✓ " : ""}Use as {slot}
-    </button>
+    <label className="block">
+      <span className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600">
+        <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
+        Select data source {slot}
+      </span>
+      <select
+        className="input"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="" disabled>
+          Choose a source…
+        </option>
+        {sources.map((ds) => (
+          <option key={ds.id} value={ds.id}>
+            {KIND_ICON[ds.kind]} {ds.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
