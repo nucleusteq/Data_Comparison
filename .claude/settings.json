@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rmdir frontend *)",
+      "Bash(npx --yes create-next-app@latest frontend --ts --app --tailwind --eslint --src-dir --import-alias \"@/*\" --no-turbopack --use-npm)",
+      "Bash(node -e \"console.log\\(require\\('next/package.json'\\).version\\)\")"
+    ]
+  }
+}
