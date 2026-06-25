@@ -64,6 +64,7 @@ export function DataSourceNav({
     setDraftKind("postgresql");
     setDraftFields(defaultFields("postgresql"));
     setDraftTest({ state: "idle" });
+    setShowErrors(false);
   };
 
   const startEdit = (ds: DataSource) => {
@@ -73,17 +74,20 @@ export function DataSourceNav({
     setDraftKind(ds.kind);
     setDraftFields({ ...defaultFields(ds.kind), ...ds.fields });
     setDraftTest({ state: "idle" });
+    setShowErrors(false);
   };
 
   const cancel = () => {
     setAdding(false);
     setEditingId(null);
+    setShowErrors(false);
   };
 
   const changeKind = (kind: DbKind) => {
     setDraftKind(kind);
     setDraftFields(defaultFields(kind));
     setDraftTest({ state: "idle" });
+    setShowErrors(false);
   };
 
   const setField = (key: string, value: string) => {
@@ -108,6 +112,11 @@ export function DataSourceNav({
 
   const save = () => {
     const spec = kindSpec(draftKind);
+    // Block saving until all required fields are filled.
+    if (missingRequiredFields(draftKind, draftFields).length > 0) {
+      setShowErrors(true);
+      return;
+    }
     const name = draftName.trim() || spec.label;
     const connectionString = buildConnectionString(draftKind, draftFields).trim();
     if (!connectionString) return;
@@ -142,6 +151,8 @@ export function DataSourceNav({
 
   const spec = kindSpec(draftKind);
   const preview = buildConnectionString(draftKind, draftFields);
+  const missing = missingRequiredFields(draftKind, draftFields);
+  const missingSet = new Set(missing);
 
   const editor = (
     <div className="space-y-3 rounded-xl border border-indigo-200 bg-white p-3 shadow-sm animate-fade-in dark:border-indigo-800 dark:bg-gray-800">
@@ -173,22 +184,36 @@ export function DataSourceNav({
           value={draftName}
           onChange={(e) => setDraftName(e.target.value)}
         />
-        {spec.fields.map((field) => (
-          <input
-            key={field.key}
-            className="input"
-            type={
-              field.type === "password"
-                ? "password"
-                : field.type === "number"
-                ? "number"
-                : "text"
-            }
-            placeholder={field.label + (field.required ? " *" : "")}
-            value={draftFields[field.key] ?? ""}
-            onChange={(e) => setField(field.key, e.target.value)}
-          />
-        ))}
+        {spec.fields.map((field) => {
+          const invalid = showErrors && missingSet.has(field.key);
+          return (
+            <div key={field.key}>
+              <input
+                className={`input ${
+                  invalid
+                    ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/30"
+                    : ""
+                }`}
+                type={
+                  field.type === "password"
+                    ? "password"
+                    : field.type === "number"
+                    ? "number"
+                    : "text"
+                }
+                placeholder={field.label + (field.required ? " *" : "")}
+                value={draftFields[field.key] ?? ""}
+                onChange={(e) => setField(field.key, e.target.value)}
+                aria-invalid={invalid}
+              />
+              {invalid && (
+                <p className="mt-0.5 text-[11px] text-rose-600 dark:text-rose-400">
+                  {field.label} is required.
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {spec.driver && (
@@ -228,8 +253,19 @@ export function DataSourceNav({
         </p>
       )}
 
+      {showErrors && missing.length > 0 && (
+        <p className="rounded bg-rose-50 px-2 py-1 text-[11px] text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+          Please fill in the required field{missing.length > 1 ? "s" : ""} marked
+          with *.
+        </p>
+      )}
+
       <div className="flex gap-2 pt-1">
-        <button className="btn btn-primary flex-1 !py-1.5 text-xs" onClick={save}>
+        <button
+          className="btn btn-primary flex-1 !py-1.5 text-xs"
+          onClick={save}
+          disabled={showErrors && missing.length > 0}
+        >
           Save
         </button>
         <button className="btn btn-ghost flex-1 !py-1.5 text-xs" onClick={cancel}>
