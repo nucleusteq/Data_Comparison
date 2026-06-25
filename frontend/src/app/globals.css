@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode (toggled on <html class="dark">). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f7f9;
+  --foreground: #1a1d21;
+}
+
+.dark {
+  --background: #0f1115;
+  --foreground: #e6e8eb;
 }
 
 @theme inline {
@@ -13,23 +21,62 @@
 }
 
 body {
-  background: #ffffff;
-  color: #171717;
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 @layer components {
   .input {
-    @apply w-full rounded border border-gray-300 px-3 py-2 text-sm
-      focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500;
+    @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900
+      shadow-sm transition
+      placeholder:text-gray-400
+      focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30;
   }
   .btn {
-    @apply rounded px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium
+      transition active:scale-[0.98]
+      disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100;
   }
   .btn-primary {
-    @apply bg-blue-600 text-white hover:bg-blue-700;
+    @apply bg-indigo-600 text-white shadow-sm hover:bg-indigo-700;
   }
   .btn-ghost {
-    @apply border border-gray-300 text-gray-700 hover:bg-gray-100;
+    @apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-50;
   }
+  .card {
+    @apply rounded-xl border border-gray-200 bg-white shadow-sm;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+}
+
+/* Subtle entrance animation for results. */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in {
+  animation: fadeInUp 0.25s ease-out both;
+}
+
+/* Custom scrollbar for the nav / scroll areas. */
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: #cbd1d9;
+  border-radius: 9999px;
+}
+.scroll-thin::-webkit-scrollbar-thumb:hover {
+  background: #aab2bd;
 }

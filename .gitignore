@@ -31,6 +31,9 @@ next-env.d.ts
 # ===== Claude Code =====
 .claude/
 
+# ===== IDE =====
+.run/
+
 # ===== Misc =====
 .DS_Store
 *.pem

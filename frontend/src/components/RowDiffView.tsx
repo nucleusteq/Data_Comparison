@@ -2,9 +2,9 @@ import type { RowDiffResponse } from "@/lib/api";
 
 function Stat({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className={`rounded border p-3 text-center ${color}`}>
-      <div className="text-2xl font-bold">{value}</div>
-      <div className="text-xs uppercase tracking-wide">{label}</div>
+    <div className={`rounded-xl border p-4 text-center shadow-sm ${color}`}>
+      <div className="text-3xl font-bold tabular-nums">{value}</div>
+      <div className="mt-0.5 text-xs font-medium uppercase tracking-wide">{label}</div>
     </div>
   );
 }

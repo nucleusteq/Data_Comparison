@@ -25,10 +25,15 @@ pip install -r requirements.txt          # add DB drivers you need
 uvicorn main:app --host 127.0.0.1 --port 8077 --reload
 ```
 
-Database drivers are optional — install only what you connect to:
+Database drivers are optional — install only what you connect to (or use
+`./setup.sh --all-drivers`):
 
 - PostgreSQL: `pip install psycopg2-binary`
-- MySQL: `pip install PyMySQL`
+- MySQL / MariaDB: `pip install PyMySQL`
+- SQL Server: `pip install pyodbc` (also needs a system ODBC driver)
+- Oracle: `pip install oracledb`
+- Snowflake: `pip install snowflake-sqlalchemy`
+- SQLite: built in, no driver needed
 
 ## 2. Run the frontend
 
