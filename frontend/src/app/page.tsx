@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, SchemaDiffResponse, RowDiffResponse, QuickCountResponse } from "@/lib/api";
 import { useLocalStorage } from "@/lib/storage";
 import { DataSource } from "@/lib/datasources";
@@ -60,6 +60,22 @@ export default function Home() {
   const sourceById = (id: string | null) => sources.find((d) => d.id === id) ?? null;
   const srcA = sourceById(state.selectedAId);
   const srcB = sourceById(state.selectedBId);
+
+  // Reconcile stale selections: if a persisted selectedA/BId no longer matches
+  // a current source (e.g. the source was deleted/re-created with a new id),
+  // clear it so the dropdown shows the placeholder instead of a phantom pick.
+  useEffect(() => {
+    if (!sources.length) return;
+    const patch: Partial<CompareState> = {};
+    if (state.selectedAId && !sources.some((d) => d.id === state.selectedAId)) {
+      patch.selectedAId = null;
+    }
+    if (state.selectedBId && !sources.some((d) => d.id === state.selectedBId)) {
+      patch.selectedBId = null;
+    }
+    if (Object.keys(patch).length) update(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sources, state.selectedAId, state.selectedBId]);
 
   const pick = (slot: "A" | "B", id: string) =>
     update(slot === "A" ? { selectedAId: id } : { selectedBId: id });

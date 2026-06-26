@@ -1,6 +1,8 @@
 """FastAPI app exposing schema/row comparison endpoints for two data sources."""
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -60,11 +62,37 @@ class CsvRequest(BaseModel):
     row_diff: dict
 
 
-def _engine(conn: str):
+def _make(conn: str):
     try:
         return comparator.make_engine(conn)
     except Exception as exc:  # invalid URL, missing driver, etc.
         raise HTTPException(status_code=400, detail=f"Invalid connection: {exc}")
+
+
+@contextmanager
+def _engine(conn: str):
+    """Yield one engine for a connection, disposing it when the request ends."""
+    engine = _make(conn)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+@contextmanager
+def _engine_pair(conn_a: str, conn_b: str):
+    """Yield engines for A and B, reusing a single engine when both connection
+    strings are identical (same data source + database). Engines are disposed
+    on exit so no server connections are left open."""
+    engine_a = _make(conn_a)
+    same = conn_a == conn_b
+    engine_b = engine_a if same else _make(conn_b)
+    try:
+        yield engine_a, engine_b
+    finally:
+        engine_a.dispose()
+        if not same:
+            engine_b.dispose()
 
 
 @app.get("/api/health")
@@ -74,20 +102,20 @@ def health():
 
 @app.post("/api/tables")
 def tables(req: ConnectionRequest):
-    engine = _engine(req.connection_string)
-    try:
-        return {"tables": comparator.list_tables(engine)}
-    except SQLAlchemyError as exc:
-        raise HTTPException(status_code=400, detail=f"Could not list tables: {exc}")
+    with _engine(req.connection_string) as engine:
+        try:
+            return {"tables": comparator.list_tables(engine)}
+        except SQLAlchemyError as exc:
+            raise HTTPException(status_code=400, detail=f"Could not list tables: {exc}")
 
 
 @app.post("/api/columns")
 def columns(req: ColumnsRequest):
-    engine = _engine(req.connection_string)
-    try:
-        schema = comparator.get_schema(engine, req.table)
-    except SQLAlchemyError as exc:
-        raise HTTPException(status_code=400, detail=f"Could not read columns: {exc}")
+    with _engine(req.connection_string) as engine:
+        try:
+            schema = comparator.get_schema(engine, req.table)
+        except SQLAlchemyError as exc:
+            raise HTTPException(status_code=400, detail=f"Could not read columns: {exc}")
     return {
         "columns": list(schema["columns"].keys()),
         "primary_key": schema["primary_key"],
@@ -96,13 +124,12 @@ def columns(req: ColumnsRequest):
 
 @app.post("/api/schema-diff")
 def schema_diff(req: CompareRequest):
-    engine_a = _engine(req.connection_a)
-    engine_b = _engine(req.connection_b)
-    try:
-        schema_a = comparator.get_schema(engine_a, req.table_a)
-        schema_b = comparator.get_schema(engine_b, req.table_b)
-    except SQLAlchemyError as exc:
-        raise HTTPException(status_code=400, detail=f"Schema introspection failed: {exc}")
+    with _engine_pair(req.connection_a, req.connection_b) as (engine_a, engine_b):
+        try:
+            schema_a = comparator.get_schema(engine_a, req.table_a)
+            schema_b = comparator.get_schema(engine_b, req.table_b)
+        except SQLAlchemyError as exc:
+            raise HTTPException(status_code=400, detail=f"Schema introspection failed: {exc}")
     return {
         "schema_a": schema_a,
         "schema_b": schema_b,
@@ -113,55 +140,52 @@ def schema_diff(req: CompareRequest):
 @app.post("/api/quick-count")
 def quick_count(req: QuickCountRequest):
     """Cheap row-count-only pre-flight before a full row diff."""
-    engine_a = _engine(req.connection_a)
-    engine_b = _engine(req.connection_b)
-    try:
-        return comparator.quick_count(
-            engine_a,
-            engine_b,
-            req.table_a,
-            req.table_b or req.table_a,
-            where_a=req.where_a,
-            where_b=req.where_b,
-        )
-    except SQLAlchemyError as exc:
-        raise HTTPException(status_code=400, detail=f"Count failed: {exc}")
+    with _engine_pair(req.connection_a, req.connection_b) as (engine_a, engine_b):
+        try:
+            return comparator.quick_count(
+                engine_a,
+                engine_b,
+                req.table_a,
+                req.table_b or req.table_a,
+                where_a=req.where_a,
+                where_b=req.where_b,
+            )
+        except SQLAlchemyError as exc:
+            raise HTTPException(status_code=400, detail=f"Count failed: {exc}")
 
 
 @app.post("/api/row-diff")
 def row_diff(req: RowCompareRequest):
-    engine_a = _engine(req.connection_a)
-    engine_b = _engine(req.connection_b)
-
-    key_columns = req.key_columns
-    if not key_columns:
-        # default to primary key of table A
-        try:
-            schema_a = comparator.get_schema(engine_a, req.table_a)
-            key_columns = schema_a["primary_key"]
-        except SQLAlchemyError as exc:
-            raise HTTPException(status_code=400, detail=f"Could not read schema: {exc}")
+    with _engine_pair(req.connection_a, req.connection_b) as (engine_a, engine_b):
+        key_columns = req.key_columns
         if not key_columns:
-            raise HTTPException(
-                status_code=400,
-                detail="No key_columns provided and table A has no primary key.",
-            )
+            # default to primary key of table A
+            try:
+                schema_a = comparator.get_schema(engine_a, req.table_a)
+                key_columns = schema_a["primary_key"]
+            except SQLAlchemyError as exc:
+                raise HTTPException(status_code=400, detail=f"Could not read schema: {exc}")
+            if not key_columns:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No key_columns provided and table A has no primary key.",
+                )
 
-    try:
-        return comparator.diff_rows(
-            engine_a,
-            engine_b,
-            req.table_a,
-            req.table_b,
-            key_columns,
-            req.limit,
-            column_map=req.column_map,
-            ignore_columns=req.ignore_columns,
-            where_a=req.where_a,
-            where_b=req.where_b,
-        )
-    except SQLAlchemyError as exc:
-        raise HTTPException(status_code=400, detail=f"Row comparison failed: {exc}")
+        try:
+            return comparator.diff_rows(
+                engine_a,
+                engine_b,
+                req.table_a,
+                req.table_b,
+                key_columns,
+                req.limit,
+                column_map=req.column_map,
+                ignore_columns=req.ignore_columns,
+                where_a=req.where_a,
+                where_b=req.where_b,
+            )
+        except SQLAlchemyError as exc:
+            raise HTTPException(status_code=400, detail=f"Row comparison failed: {exc}")
 
 
 @app.post("/api/sync-sql")

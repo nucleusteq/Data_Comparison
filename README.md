@@ -21,19 +21,20 @@ frontend/   Next.js app
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt          # add DB drivers you need
+pip install -r requirements.txt          # installs all DB drivers by default
 uvicorn main:app --host 127.0.0.1 --port 8077 --reload
 ```
 
-Database drivers are optional — install only what you connect to (or use
-`./setup.sh --all-drivers`):
+`requirements.txt` installs drivers for all supported databases out of the box:
 
-- PostgreSQL: `pip install psycopg2-binary`
-- MySQL / MariaDB: `pip install PyMySQL`
-- SQL Server: `pip install pyodbc` (also needs a system ODBC driver)
-- Oracle: `pip install oracledb`
-- Snowflake: `pip install snowflake-sqlalchemy`
+- PostgreSQL: `psycopg[binary]` (psycopg3) → `postgresql+psycopg://…`
+- MySQL / MariaDB: `PyMySQL` → `mysql+pymysql://…`
+- Oracle: `oracledb` → `oracle+oracledb://…`
+- Snowflake: `snowflake-sqlalchemy` → `snowflake://…`
 - SQLite: built in, no driver needed
+- SQL Server: `pyodbc` is installed, but **also needs a system ODBC library**
+  that pip can't provide. On macOS: `brew install unixodbc` plus Microsoft's
+  ODBC Driver 18.
 
 ## 2. Run the frontend
 
@@ -52,7 +53,7 @@ NEXT_PUBLIC_API_BASE=http://your-host:port npm run dev
 ## 3. Use it
 
 1. Enter a **connection string** for Source A and Source B (SQLAlchemy URL format):
-   - `postgresql+psycopg2://user:pass@host:5432/dbname`
+   - `postgresql+psycopg://user:pass@host:5432/dbname`
    - `mysql+pymysql://user:pass@host:3306/dbname`
 2. Enter the **table** name(s). Leave Table B blank to reuse Table A.
 3. Enter **key column(s)** for row matching (comma-separated). Leave blank to use

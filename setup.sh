@@ -82,29 +82,18 @@ fi
 # shellcheck disable=SC1091
 ./.venv/bin/python -m pip install --quiet --upgrade pip
 if [[ -f requirements.txt ]]; then
-  # requirements.txt may pin drivers behind markers; install core explicitly too.
-  ./.venv/bin/pip install --quiet fastapi "uvicorn[standard]" sqlalchemy pydantic
-  ok "installed core backend dependencies (fastapi, uvicorn, sqlalchemy, pydantic)"
+  # requirements.txt now includes all DB drivers, so the base install gets
+  # PostgreSQL/MySQL/Oracle/SQL Server/Snowflake support out of the box.
+  ./.venv/bin/pip install --quiet -r requirements.txt
+  ok "installed backend dependencies + DB drivers from requirements.txt"
 else
   warn "requirements.txt missing — installed core deps only"
   ./.venv/bin/pip install --quiet fastapi "uvicorn[standard]" sqlalchemy pydantic
 fi
 
-if [[ "$WANT_PG" == "1" ]]; then
-  ./.venv/bin/pip install --quiet psycopg2-binary && ok "installed PostgreSQL driver (psycopg2-binary)"
-fi
-if [[ "$WANT_MYSQL" == "1" ]]; then
-  ./.venv/bin/pip install --quiet PyMySQL && ok "installed MySQL/MariaDB driver (PyMySQL)"
-fi
-if [[ "$WANT_MSSQL" == "1" ]]; then
-  ./.venv/bin/pip install --quiet pyodbc && ok "installed SQL Server driver (pyodbc)"
-  warn "SQL Server also needs a system ODBC driver (e.g. 'ODBC Driver 18 for SQL Server')."
-fi
-if [[ "$WANT_ORACLE" == "1" ]]; then
-  ./.venv/bin/pip install --quiet oracledb && ok "installed Oracle driver (oracledb)"
-fi
-if [[ "$WANT_SNOWFLAKE" == "1" ]]; then
-  ./.venv/bin/pip install --quiet snowflake-sqlalchemy && ok "installed Snowflake driver (snowflake-sqlalchemy)"
+# SQL Server's pyodbc needs a system ODBC library that pip can't provide.
+if [[ "$WANT_MSSQL" == "1" || "$WANT_PG$WANT_MYSQL$WANT_ORACLE$WANT_SNOWFLAKE" != "0000" ]]; then
+  warn "SQL Server (pyodbc) also needs a system ODBC driver. On macOS: 'brew install unixodbc' plus Microsoft's ODBC Driver 18."
 fi
 
 # ---------------------------------------------------------------------------

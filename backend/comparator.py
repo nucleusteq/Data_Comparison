@@ -5,15 +5,32 @@ from typing import Any
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.pool import NullPool, StaticPool
 
 
 def make_engine(connection_string: str) -> Engine:
     """Create a SQLAlchemy engine. Accepts any SQLAlchemy URL, e.g.:
     sqlite:////abs/path/to.db
-    postgresql+psycopg2://user:pass@host:5432/dbname
+    postgresql+psycopg://user:pass@host:5432/dbname
     mysql+pymysql://user:pass@host:3306/dbname
+
+    Uses NullPool so connections are opened on demand and closed immediately
+    when released, rather than being held in a pool. This keeps the tool's
+    footprint to a single live connection per query — important against servers
+    with a low max_connections or reserved superuser slots.
+
+    In-memory SQLite (":memory:") is the exception: each new connection there is
+    a separate, empty database, so it needs a StaticPool that keeps one shared
+    connection alive for the engine's lifetime (used by tests).
     """
-    return create_engine(connection_string, future=True)
+    if connection_string in ("sqlite://", "sqlite:///:memory:"):
+        return create_engine(
+            connection_string,
+            future=True,
+            poolclass=StaticPool,
+            connect_args={"check_same_thread": False},
+        )
+    return create_engine(connection_string, future=True, poolclass=NullPool)
 
 
 def quote_table(engine: Engine, table: str) -> str:

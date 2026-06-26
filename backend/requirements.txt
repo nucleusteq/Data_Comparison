@@ -2,6 +2,11 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 sqlalchemy==2.0.36
 pydantic==2.10.4
-# Optional DB drivers — install the ones you need:
-psycopg2-binary==2.9.10   ; python_version < "3.13"
-PyMySQL==1.1.1
+
+# Database drivers (installed by default so connections work out of the box).
+# psycopg3 is used for PostgreSQL (postgresql+psycopg://) — supports Python 3.13+.
+psycopg[binary]>=3.2
+PyMySQL>=1.1
+oracledb>=2.0
+pyodbc>=5.1                # SQL Server; also needs a system ODBC driver
+snowflake-sqlalchemy>=1.6  # Snowflake

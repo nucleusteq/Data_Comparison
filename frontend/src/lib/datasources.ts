@@ -55,10 +55,10 @@ export const KINDS: KindSpec[] = [
   {
     kind: "postgresql",
     label: "PostgreSQL",
-    driver: "psycopg2-binary",
+    driver: "psycopg[binary] (psycopg3)",
     fields: hostPortFields("5432"),
     build: (f) =>
-      `postgresql+psycopg2://${enc(f.username)}:${enc(f.password)}@${f.host}:${f.port || "5432"}/${enc(f.database)}`,
+      `postgresql+psycopg://${enc(f.username)}:${enc(f.password)}@${f.host}:${f.port || "5432"}/${enc(f.database)}`,
   },
   {
     kind: "mysql",
